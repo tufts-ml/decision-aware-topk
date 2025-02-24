@@ -1,0 +1,20 @@
+name: topk
+channels:
+  - conda-forge
+dependencies:
+  - pip
+  - python[version='<3.12']
+prefix: mambaforge/envs/topk
+  - pip:
+    - geopandas
+    - ipython
+    - jupyter
+    - numpy
+    - pandas
+    - scipy
+    - seaborn
+    - shapely
+    - six
+    - torch
+    - torchaudio
+    - torchvision
