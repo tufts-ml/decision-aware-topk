@@ -12,14 +12,13 @@ from torch_training import train_epoch
 
 def main(step_size=None, epochs=None, bpr_weight=None,
          nll_weight=None, seed=None, init_idx=None, outdir=None, epsilon=None,
-           num_components=None, perturbed_noise=None, initialization=None):
+           num_components=None, perturbed_noise=None, initialization=None, device=None):
 
 
     # total timepoints
     T= 500
     S=7
     K=5
-    device = 'cpu'
 
     dist_S = [QuantizedNormal(10, 0.3),
             QuantizedNormal(20, 0.3),
@@ -87,7 +86,7 @@ def main(step_size=None, epochs=None, bpr_weight=None,
     losses, bprs, nlls = [], [], []
     for epoch in range(epochs):
         print(f'EPOCH: {epoch}')
-        loss, bpr, nll, model = train_epoch(model, optimizer, K, epsilon, train_T, M_score_func, M_action, train_y_TS, perturbed_top_K_func, bpr_weight, nll_weight)
+        loss, bpr, nll, model = train_epoch(model, optimizer, K, epsilon, train_T, M_score_func, M_action, torch.tensor(train_y_TS).to(device), perturbed_top_K_func, bpr_weight, nll_weight)
         losses.append(loss)
         bprs.append(bpr)
         nlls.append(nll)
@@ -117,6 +116,7 @@ if __name__ ==  "__main__":
     parser.add_argument("--perturbed_noise", type=float, default=0.05)
     parser.add_argument("--initialization", type=str, required=False)
     parser.add_argument("--init_idx", type=int, required=False)
+    parser.add_argument("--device", type=str, default='cpu')
 
     args = parser.parse_args()
     # call main with args as keywrods
