@@ -30,7 +30,7 @@ def compute_jacobian_per_parameter(model, y_sample_TMS, device):
     jacobians = []
 
     for i in range(len(params)):
-        print(f'EYE EYE EYE CRAZY TRAIN {i}')
+
         def single_param_log_prob(param_scalar):
             param_copy = params.clone()
             param_copy[i] = param_scalar
