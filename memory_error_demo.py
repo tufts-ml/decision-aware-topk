@@ -145,9 +145,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("\nRunning with Jacobian computed per parameter:")
-    main(epochs=args.epochs, device=args.device, compute_jacobian_together=False)
+    main(epochs=args.epochs, device=args.device, compute_jacobian_together=False, T=100, S=30, K=10)
+
 
     print("Running with Jacobian computed all together:")
-    main(epochs=args.epochs, device=args.device, compute_jacobian_together=True)
+    main(epochs=args.epochs, device=args.device, compute_jacobian_together=True, T=100, S=30, K=10)
 
+    
+
+    
     
