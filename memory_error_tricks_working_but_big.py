@@ -477,7 +477,8 @@ if __name__ == "__main__":
     parser.add_argument("--detect_anomaly", action='store_true', help='Enable PyTorch anomaly detection')
     parser.add_argument("--seed", type=int, default=360, help='Random seed')
     parser.add_argument("--jacobian_method", type=str, choices=['together', 'per_parameter', 'accumulating'], default='together', help='Method to compute the Jacobian: together, per_parameter, or accumulating')
-    
+    parser.add_argument("--perturbation_samples", type=int, default=100, help='Number of perturbation samples for BPR calculation')
+    parser.add_argument("--num_components", type=int, default=4, help='Number of components in the mixture model')
     args = parser.parse_args()
 
     print("Running with optimized memory settings:")
@@ -492,5 +493,6 @@ if __name__ == "__main__":
         score_func_samples=args.score_func_samples,
         debug_memory=args.debug_memory,
         detect_anomaly=args.detect_anomaly,
-        seed=args.seed
+        seed=args.seed,
+        num_components=args.num_components
     )
