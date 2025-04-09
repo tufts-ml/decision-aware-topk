@@ -4,9 +4,9 @@
 
 ### Goal: Create a spatiotemporal forecasting data class
 
-```markdown
+
 ![Data Class Diagram](DataClass.png)
-```
+
 
 Constructor/ Attributes:
  - Dynamic features, TxSxF_dyn
