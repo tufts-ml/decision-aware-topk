@@ -25,16 +25,16 @@ def set_torch_tensor(df):
         raise ValueError('Unrecognized input. Please only use torch Tensors, Pandas DataFrames, or Numpy arrays')
 
 
-def ensure_dimensions_match(dynamic_feats_TSF, static_feats_SF, temp_feats_TF, adj_SS):
+def ensure_dimensions_match(dynamic_feats_TSFd, static_feats_SFs, temp_feats_TFt, adj_SS):
     # Ensure T dimensions match pairwise:
-    assert dynamic_feats_TSF.shape[0] == temp_feats_TF.shape[0], \
-        "Mismatch in T dimension: dynamic_feats_TSF.shape[0]={} vs temp_feats_TF.shape[0]={}".format(
-            dynamic_feats_TSF.shape[0], temp_feats_TF.shape[0])
+    assert dynamic_feats_TSF.shape[0] == temp_feats_TFt.shape[0], \
+        "Mismatch in T dimension: dynamic_feats_TSF.shape[0]={} vs temp_feats_TFt.shape[0]={}".format(
+            dynamic_feats_TSF.shape[0], temp_feats_TFt.shape[0])
 
     # Ensure S dimensions match pairwise:
-    assert dynamic_feats_TSF.shape[1] == static_feats_SF.shape[0], \
-        "Mismatch in S dimension: dynamic_feats_TSF.shape[1]={} vs static_feats_SF.shape[0]={}".format(
-            dynamic_feats_TSF.shape[1], static_feats_SF.shape[0])
+    assert dynamic_feats_TSF.shape[1] == static_feats_SFs.shape[0], \
+        "Mismatch in S dimension: dynamic_feats_TSF.shape[1]={} vs static_feats_SFs.shape[0]={}".format(
+            dynamic_feats_TSF.shape[1], static_feats_SFs.shape[0])
     assert dynamic_feats_TSF.shape[1] == adj_SS.shape[0], \
         "Mismatch in S dimension: dynamic_feats_TSF.shape[1]={} vs adj_SS.shape[0]={}".format(
             dynamic_feats_TSF.shape[1], adj_SS.shape[0])
@@ -42,40 +42,54 @@ def ensure_dimensions_match(dynamic_feats_TSF, static_feats_SF, temp_feats_TF, a
         "Mismatch in S dimension: adj_SS is not square (shape: {} vs {})".format(
             adj_SS.shape[0], adj_SS.shape[1])
 
-    # Ensure F dimensions match pairwise:
-    assert dynamic_feats_TSF.shape[2] == static_feats_SF.shape[1], \
-        "Mismatch in F dimension: dynamic_feats_TSF.shape[2]={} vs static_feats_SF.shape[1]={}".format(
-            dynamic_feats_TSF.shape[2], static_feats_SF.shape[1])
-    assert dynamic_feats_TSF.shape[2] == temp_feats_TF.shape[1], \
-        "Mismatch in F dimension: dynamic_feats_TSF.shape[2]={} vs temp_feats_TF.shape[1]={}".format(
-            dynamic_feats_TSF.shape[2], temp_feats_TF.shape[1])
-
-
 class Dataset:
 
-    def __init__(self, dynamic_feats_TSF, static_feats_SF, temp_feats_TF, adj_SS):
+    def __init__(self, dynamic_feats_TSFd, static_feats_SFs=None, temp_feats_TFt=None, adj_SS=None):
+
+        self.T, self.S, self.Fd = dynamic_feats_TSF.shape
+
+        # check which variables exist
+        if not static_feats_SFs:
+            static_feats_SFs = torch.Tensor(np.zeros((S, 1)))
+        if not temp_feats_TFt:
+            temp_feats_TFt = torch.Tensor(np.zeros((T, 1)))
+        if not adj_SS:
+            adj_SS = torch.Tensor(np.zeros((S, S)))
+
+        self.Fs = static_feats_SFs.shape[1]
+        self.Ft = temp_feats_TFt.shape[1]
 
         # Ensure dimensions match across 
-        ensure_dimensions_match(dynamic_feats_TSF, static_feats_SF, temp_feats_TF, adj_SS)        
+        ensure_dimensions_match(dynamic_feats_TSF, static_feats_SFs, temp_feats_TFt, adj_SS)        
 
         # Ensure inputs are torch tensors
         dynamic_feats_TSF = set_torch_tensor(dynamic_feats_TSF)
-        static_feats_SF = set_torch_tensor(static_feats_SF)
-        temp_feats_TF = set_torch_tensor(temp_feats_TF)
+        static_feats_SFs = set_torch_tensor(static_feats_SFs)
+        temp_feats_TFt = set_torch_tensor(temp_feats_TFt)
         adj_SS = set_torch_tensor(adj_SS)
 
         # Initialize features
-        self.T, self.S, self.F = dynamic_feats_TSF.shape
         self.dynamic_feats_TSF = dynamic_feats_TSF
-        self.static_feats_SF = static_feats_SF
-        self.temp_feats_TF = temp_feats_TF
+        self.static_feats_SFs = static_feats_SFs
+        self.temp_feats_TFt = temp_feats_TFt
         self.adj_SS = adj_SS
+        
 
     def to_3D(self):
-        pass
+        """
+        Returns a TxSxF matrix suitable for modeling
+        """
+
+        static_feats_TSFs = self.static_feats_SFs.repeat(T, 1, 1)
+        temp_feats_TSFt = self.temp_feats_TFt.unsqueeze(1, S, 1)
+
+        final_3D = torch.cat([self.dynamic_feats_TSF, static_feats_TSFs], dim=2)
+        final_3D = torch.cat([final_3D, temp_feats_TSFt], dim=2)
+        return final_3D
+
 
     def to_2D(self):
-        
+
         
     
 
