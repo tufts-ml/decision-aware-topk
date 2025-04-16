@@ -81,7 +81,7 @@ class Dataset:
         """
 
         static_feats_TSFs = self.static_feats_SFs.repeat(T, 1, 1)
-        temp_feats_TSFt = self.temp_feats_TFt.unsqueeze(1, S, 1)
+        temp_feats_TSFt = self.temp_feats_TFt.repeat(1, S, 1)
 
         final_3D = torch.cat([self.dynamic_feats_TSF, static_feats_TSFs], dim=2)
         final_3D = torch.cat([final_3D, temp_feats_TSFt], dim=2)
