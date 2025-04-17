@@ -35,12 +35,13 @@ class TestDataset(unittest.TestCase):
 
     def test_2D_(self):
         """
-        Test whether to_3D runs for all zero array
+        Test whether to_2D runs for all zero array
         """
         d, s, t, a = valid_arrays()
         df = Dataset(d, s, t, a)
         df_2d = df.to_2D()
         print(df_2d.shape)
+
 
     def test_3D_(self):
         """
@@ -51,7 +52,6 @@ class TestDataset(unittest.TestCase):
         df_3d = df.to_3D()
 
 
-
     def test_3D_all_zeros(self):
         """
         Test whether to_3D runs for all zero array
@@ -60,8 +60,6 @@ class TestDataset(unittest.TestCase):
         df = Dataset(d, s, t, a)
         df.to_3D()
     
- 
-
 
     """
     Test __init__
