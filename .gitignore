@@ -7,7 +7,6 @@ test*/
 
 # SpatioTemporalForecaster
 SpatioTemporalForecaster/tests/__pycache__
-SpatioTemporalForecaster/tests/__pycache__/__init__.cpython-311.pyc
 SpatioTemporalForecaster/data_dir
 SpatioTemporalForecaster/cook.py
 SpatioTemporalForecaster/crane.py
