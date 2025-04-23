@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 from collections import namedtuple
 import ast
-
+import pickle
 
 # defining date range
 DATE_RANGE_TRANSLATOR = {  
@@ -911,6 +911,7 @@ def df_to_tensor(df, temporal_res):
     tensor_list = []
     
     prev_counts_tensor = None  # will hold the sorted 'counts' tensor from the previous timestep
+    
     for t in timesteps:
         # Get the sub-dataframe for the current timestep and sort by spatial location
         sub_df = df[df[id_col] == t].copy().sort_values(by=['lat', 'long'])
@@ -1004,12 +1005,40 @@ def compute_adjacency_matrix(df):
     return A
 
 
+def compute_adjacency_matrix(df, scale_factor=30):
+    """
+    Computes an adjacency matrix for spatial bins using the latitude and longitude columns.
+    
+    Each entry A[i, j] is defined as:
+        A[i, j] = 1 / euclidean_distance(bin_i, bin_j)
+    with the convention that for i == j, A[i, j] is set to 1.
+    
+    Parameters:
+      df: DataFrame containing 'lat' and 'long' columns, each row representing a spatial bin.
+      scale_factor: factor by which to normalize distances by. higher means points will count as
+        further away from each other. this should change based on the dataset
+      
+    Returns:
+      A torch tensor of shape (S, S) representing the adjacency matrix.
+    """
+    # Extract coordinates as a tensor of shape (S, 2)
+    coords = df[['lat', 'long']].groupby(['lat', 'long']).first().reset_index().values
+    coords_tensor = torch.tensor(coords, dtype=torch.float)
+    
+    # Compute pairwise Euclidean distances
+    distances = torch.cdist(coords_tensor, coords_tensor, p=2)
+    # Compute reciprocal of distances.
+    # Note: division by zero occurs on the diagonal, so we override that next.
+    A = 1.0 / (30 * distances + 1)
+    A[A < 0.3] = 0
+    
+    return A
+
 
 def main(temporal_res: str, context_size=5, box_length_m=500, map_size='small', **kwargs):
     """
     Converts whooping crane raw data to dataset format
     """
-
 
     if 'tsteps_to_study' in kwargs.keys():
         tsteps_to_study = kwargs['tsteps_to_study'] # set how many tsteps will be in train-val-test
@@ -1038,8 +1067,18 @@ def main(temporal_res: str, context_size=5, box_length_m=500, map_size='small', 
         # index 4 of dim 3 of X = target y at timestep t-1
         assert x[2, i, 4] == y[1, i]
 
-    print(x, y)
-    print('done')
+    A = compute_adjacency_matrix(gdf)
+    dataset = {'features': x, 'targets': y, 'graph': A}
+
+    path_to_final_data = '../data/model-ready'
+    if not os.path.exists(path_to_final_data):
+        os.makedirs(path_to_final_data)
+
+    with open(f'{path_to_final_data}/aerial_surv.pkl', 'wb') as f:
+        pickle.dump(dataset, f)
+    
+    print(f'Data loaded to {path_to_final_data}')
+
 
 if __name__ == '__main__':
 

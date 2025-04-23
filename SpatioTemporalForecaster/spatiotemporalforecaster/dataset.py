@@ -5,42 +5,6 @@ import torch
 import pandas as pd
 import numpy as np
 
-def set_torch_tensor(df):
-    """
-    Converts a dataframe to a torch tensor.
-    Parameters:
-        df (torch.Tensor or pd.DataFrame or np.array): The input dataframe.
-    Returns:
-        torch.Tensor: The converted torch tensor.
-    Raises:
-        ValueError: If the input is not a recognized type (torch Tensor, Pandas DataFrame, or Numpy array).
-    """
-    if isinstance(df, torch.Tensor):
-        return df
-    elif isinstance(df, pd.DataFrame):
-        return torch.from_numpy(df.values)
-    elif isinstance(df, type(np.array([]))):
-        return torch.from_numpy(df)
-    else:
-        raise ValueError('Unrecognized input. Please only use torch Tensors, Pandas DataFrames, or Numpy arrays')
-
-
-def ensure_dimensions_match(dynamic_feats_TSFd, static_feats_SFs, temp_feats_TFt, adj_SS):
-    # Ensure T dimensions match pairwise:
-    assert dynamic_feats_TSFd.shape[0] == temp_feats_TFt.shape[0], \
-        "Mismatch in T dimension: dynamic_feats_TSFd.shape[0]={} vs temp_feats_TFt.shape[0]={}".format(
-            dynamic_feats_TSFd.shape[0], temp_feats_TFt.shape[0])
-
-    # Ensure S dimensions match pairwise:
-    assert dynamic_feats_TSFd.shape[1] == static_feats_SFs.shape[0], \
-        "Mismatch in S dimension: dynamic_feats_TSFd.shape[1]={} vs static_feats_SFs.shape[0]={}".format(
-            dynamic_feats_TSFd.shape[1], static_feats_SFs.shape[0])
-    assert dynamic_feats_TSFd.shape[1] == adj_SS.shape[0], \
-        "Mismatch in S dimension: dynamic_feats_TSFd.shape[1]={} vs adj_SS.shape[0]={}".format(
-            dynamic_feats_TSFd.shape[1], adj_SS.shape[0])
-    assert adj_SS.shape[0] == adj_SS.shape[1], \
-        "Mismatch in S dimension: adj_SS is not square (shape: {} vs {})".format(
-            adj_SS.shape[0], adj_SS.shape[1])
 
 class Dataset:
 
@@ -74,6 +38,46 @@ class Dataset:
         self.temp_feats_TFt = temp_feats_TFt
         self.adj_SS = adj_SS
         
+
+    @staticmethod
+    def ensure_dimensions_match(dynamic_feats_TSFd, static_feats_SFs, temp_feats_TFt, adj_SS):
+        # Ensure T dimensions match pairwise:
+        assert dynamic_feats_TSFd.shape[0] == temp_feats_TFt.shape[0], \
+            "Mismatch in T dimension: dynamic_feats_TSFd.shape[0]={} vs temp_feats_TFt.shape[0]={}".format(
+                dynamic_feats_TSFd.shape[0], temp_feats_TFt.shape[0])
+
+        # Ensure S dimensions match pairwise:
+        assert dynamic_feats_TSFd.shape[1] == static_feats_SFs.shape[0], \
+            "Mismatch in S dimension: dynamic_feats_TSFd.shape[1]={} vs static_feats_SFs.shape[0]={}".format(
+                dynamic_feats_TSFd.shape[1], static_feats_SFs.shape[0])
+        assert dynamic_feats_TSFd.shape[1] == adj_SS.shape[0], \
+            "Mismatch in S dimension: dynamic_feats_TSFd.shape[1]={} vs adj_SS.shape[0]={}".format(
+                dynamic_feats_TSFd.shape[1], adj_SS.shape[0])
+        assert adj_SS.shape[0] == adj_SS.shape[1], \
+            "Mismatch in S dimension: adj_SS is not square (shape: {} vs {})".format(
+                adj_SS.shape[0], adj_SS.shape[1])
+    
+    @staticmethod
+    def set_torch_tensor(df):
+        """
+        Converts a dataframe to a torch tensor.
+        Parameters:
+            df (torch.Tensor or pd.DataFrame or np.array): The input dataframe.
+        Returns:
+            torch.Tensor: The converted torch tensor.
+        Raises:
+            ValueError: If the input is not a recognized type (torch Tensor, Pandas DataFrame, or Numpy array).
+        """
+        if isinstance(df, torch.Tensor):
+            return df
+        elif isinstance(df, pd.DataFrame):
+            return torch.from_numpy(df.values)
+        elif isinstance(df, type(np.array([]))):
+            return torch.from_numpy(df)
+        else:
+            raise ValueError('Unrecognized input. Please only use torch Tensors, Pandas DataFrames, or Numpy arrays')
+
+            
 
     def to_3D(self):
         """
