@@ -8,7 +8,72 @@ import numpy as np
 
 class Dataset:
 
-    def __init__(self, dynamic_feats_TSFd, static_feats_SFs=None, temp_feats_TFt=None, adj_SS=None):
+    # TODO fill
+    @staticmethod
+    def initialize_from_full_df(full_df, dataset_specs):
+        """
+                dataset_specs = {
+                        'lookback':
+                        'time_name': 
+                        'space_name': 
+                        'target_name':
+                        'static': 
+                        'dynamic': 
+                        'temporal': 
+                        'latlong': 
+                        'box_length_m'
+                    }
+        """
+
+        # Initialize features
+        self.dynamic_feats_TSFd = dynamic_feats_TSFd
+        self.temp_feats_TFt = temp_feats_TFt
+
+        self.dynamic_feats_TSFd = df_to_tensor(gdf, type_='dynamic', **dataset_specs)
+        self.static_feats_SFs = df_to_tensor(gdf, type_='static', **dataset_specs)
+        self.temp_feats_TFt = df_to_tensor(gdf, type_='temporal', **dataset_specs)
+        # TODO add dist_sensitivity as user argument
+        self.adj_SS = compute_adjacency_matrix(gdf, dist_sensitivity=30, **dataset_specs)
+
+        time = dataset_specs['time_name']
+        spatial_bin_size = dataset_specs['box_length_m']
+        path_to_final_data = f'../../data/aerial_surv/model-ready/{time_name}_{box_length_m}M'
+        if not os.path.exists(path_to_final_data):
+            os.makedirs(path_to_final_data)
+
+        self.dynamic_feats_TSFd.to_csv(f'{path_to_final_data}/dynamic.csv')
+        self.static_feats_SFs.to_csv(f'{path_to_final_data}/static.csv')
+        self.temp_feats_TFt.to_csv(f'{path_to_final_data}/temporal.csv')
+        self.adj_SS.to_csv(f'{path_to_final_data}/adjacency.csv')
+        
+        print(f'Data loaded to {path_to_final_data}')
+
+    def __init__(self, full_df=None, dataset_specs=None, dynamic_feats_TSFd=None, static_feats_SFs=None, temp_feats_TFt=None, adj_SS=None, **kwargs):
+
+        """
+        User can initialize with:
+            - pre-loaded dataframes (dynamic_feats_TSFd, static_feats_SFs, temp_feats_TFt, adj_SS)
+        OR:
+            - user can upload a dataframe with the following form
+                (T x S) x F
+                and a dict with
+                    TODO fill
+                    dataset_specs = {
+                        'lookback':
+                        'time_name': 
+                        'space_name': 
+                        'target_name':
+                        'static': 
+                        'dynamic': 
+                        'temporal': 
+                        'latlong': 
+                        'box_length_m': 
+                    }
+        """
+        if 'lookback' in kwargs.keys():
+            self.initialize_from_full_df()
+
+
         self.T, self.S, self.Fd = dynamic_feats_TSFd.shape
 
         # check which variables exist

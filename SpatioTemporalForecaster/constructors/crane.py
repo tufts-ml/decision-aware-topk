@@ -10,11 +10,11 @@ from datetime import datetime
 from collections import namedtuple
 import ast
 import pickle
-from dataset_constructor_funcs import df_to_tensor, df_to_tensor_y, compute_adjacency_matrix
+from dataset_constructor_funcs import df_to_tensor, df_to_y_tensor, compute_adjacency_matrix
 
 ### TODO 
 ### split into static and dynamic features for seasonal effects
-### add constructor for GPS?
+### add constructor for GPS
 
 # defining date range
 DATE_RANGE_TRANSLATOR = {  
@@ -49,8 +49,6 @@ MONTH_PAIRS_TRANSLATOR = {
     '2monthly': ["02-28", "04-30", "10-20", "12-25"],
     '3monthly': ["01-31", "04-30", "10-20"]
 }
-
-
 
 MAP_SIZE_TRANSLATOR = {
     'medium': {
@@ -228,7 +226,7 @@ def is_valid_bimonth_name(name):
     except Exception:
         return False
 
-def recalibrate_bimonth_ids(gdf):
+def recalibrate_bimonth_ids(gdf, col_id='bimonth', col_name='bimonth_name'):
     """
     Given a GeoDataFrame (or DataFrame) with columns:
       - "bimonth" (integer ID) and
@@ -242,29 +240,29 @@ def recalibrate_bimonth_ids(gdf):
          (For example, if the name gap is 2 but the IDs jump by 3, the new ID will be
           previous_ID + 2.)
     """
-    # Step 1: Drop rows with invalid bimonth_name.
-    invalid_indices = []
-    for idx, row in gdf.iterrows():
-        name = row['bimonth_name']
-        if not is_valid_bimonth_name(name):
-            invalid_indices.append(idx)
-    if invalid_indices:
-        print("Dropping rows with invalid bimonth_name at indices:", invalid_indices)
-        gdf = gdf.drop(index=invalid_indices).reset_index(drop=True)
+    # Step 1: Drop rows with invalid id.
+    if col_id == 'bimonth':
+        invalid_indices = []
+        for idx, row in gdf.iterrows():
+            name = row[col_name]
+            if not is_valid_bimonth_name(name):
+                invalid_indices.append(idx)
+        if invalid_indices:
+            print(f"Dropping rows with invalid {col_name} at indices:", invalid_indices)
+            gdf = gdf.drop(index=invalid_indices).reset_index(drop=True)
 
-    # (Optional) Sort by bimonth if not already sorted.
-    gdf = gdf.sort_values("bimonth").reset_index(drop=True)
+    gdf = gdf.sort_values(col_id).reset_index(drop=True)
 
     # Step 2 & 3: Walk through the rows and reassign bimonth IDs.
     new_ids = []
     for i, row in gdf.iterrows():
         if i == 0:
             # For the first row, we can either keep the original ID or start anew.
-            new_id = row['bimonth']
+            new_id = row[col_id]
             new_ids.append(new_id)
         else:
-            prev_name = gdf.loc[i - 1, 'bimonth_name']
-            curr_name = row['bimonth_name']
+            prev_name = gdf.loc[i - 1, col_name]
+            curr_name = row[col_name]
             try:
                 expected_gap = date_range_gap(curr_name, prev_name)
             except ValueError as err:
@@ -274,11 +272,11 @@ def recalibrate_bimonth_ids(gdf):
             # Calculate new ID as previous new ID plus the expected gap.
             new_id = new_ids[i - 1] + expected_gap
             # (Optional) Report if the original gap did not match.
-            original_gap = row['bimonth'] - gdf.loc[i - 1, 'bimonth']
+            original_gap = row[col_id] - gdf.loc[i - 1, col_id]
             # if original_gap != expected_gap:
                 # print(f"Row {i}: original ID gap ({original_gap}) does not match expected ({expected_gap}). Resetting ID.")
             new_ids.append(new_id)
-    gdf['bimonth'] = new_ids
+    gdf[col_id] = new_ids
     return gdf
 
 
@@ -298,29 +296,32 @@ def read_asurv(years_through_2011=10, temporal_res='weekly', context_size=5, map
     """
     
     # read and turn into a geopandas dataframe
-    print()
-    df = pd.read_csv('../data/raw/aerial_surv/WHCR_Aerial_Observations_1950_2011.txt', encoding='latin1', sep='\t')
-    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.X, df.Y), crs='EPSG:26914')
+    df = pd.read_csv('../../data/raw/aerial_surv/WHCR_Aerial_Observations_1950_2011.txt', encoding='latin1', sep='\t')
     
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.X, df.Y), crs='EPSG:26914')
+    print(type(gdf))
+
     # cut years based on function parameter
     gdf = gdf[gdf['Year'].isin(gdf['Year'].unique()[-years_through_2011:])]
 
     # add time resolution
     gdf['date'] = pd.to_datetime(df[['Year', 'Month', 'Day']])
-    
+
+    gdf = gdf[gdf['Month'].isin([10, 11, 12, 1, 2, 3, 4])]
+
     if temporal_res == 'seasonal':
 
         gdf['season'] = gdf['date'].apply(determine_season_year)
         gdf['season_name'] = gdf['season']
 
-    elif temporal_res == '2monthly' or temporal_res == '3monthly':
+    elif temporal_res == '2monthly':
 
         gdf['season'] = gdf['date'].apply(determine_season_year)
         gdf = gdf.dropna(subset='season')
         gdf['season'] = gdf['season'].astype('int')
 
         all_dates = pd.DatetimeIndex([])
-        
+        print(type(gdf))
         for szn in gdf['season'].unique():
 
             # set month ID
@@ -341,9 +342,10 @@ def read_asurv(years_through_2011=10, temporal_res='weekly', context_size=5, map
         gdf = gdf[valid_idxs]
 
         gdf = recalibrate_bimonth_ids(gdf)
+        print(type(gdf))
             
     else:
-        
+
         all_dates = pd.date_range(start=gdf['date'].min() - DateOffset(days=DATE_OFFSET_TRANSLATOR[temporal_res]), end=gdf['date'].max() + DateOffset(days=DATE_OFFSET_TRANSLATOR[temporal_res]), freq=DATE_RANGE_TRANSLATOR[temporal_res])
         gdf[DATE_NAME_TRANSLATOR[temporal_res]] = np.searchsorted(all_dates, gdf['date'])  
         # add names for weeks for data clarity
@@ -354,20 +356,21 @@ def read_asurv(years_through_2011=10, temporal_res='weekly', context_size=5, map
 
         gdf[f'{DATE_NAME_TRANSLATOR[temporal_res]}_name'] = gdf[DATE_NAME_TRANSLATOR[temporal_res]].map(bin_names)
         gdf[DATE_NAME_TRANSLATOR[temporal_res]] = reindex_consecutive(gdf[DATE_NAME_TRANSLATOR[temporal_res]])
+        
 
     gdf['count'] = gdf['WHITE'].fillna(0) + gdf['JUVE'].fillna(0) + gdf['UNK'].fillna(0) 
 
+    complete_idx_square = True
+    keep_geometry_col = False
+    save_shp_folder = False
+    print(type(gdf))
+
     if keep_geometry_col:
-        columns_of_interest = ['date', f"{DATE_NAME_TRANSLATOR[temporal_res]}", f"{DATE_NAME_TRANSLATOR[temporal_res]}_name", 'X', 'Y', 'season', 'count', 'geometry']
+        columns_of_interest = list(set(['date', f"{DATE_NAME_TRANSLATOR[temporal_res]}", f"{DATE_NAME_TRANSLATOR[temporal_res]}_name", 'X', 'Y', 'season', 'count', 'geometry']))
     else:
-        columns_of_interest = ['date', f"{DATE_NAME_TRANSLATOR[temporal_res]}", f"{DATE_NAME_TRANSLATOR[temporal_res]}_name", 'X', 'Y', 'season', 'count']
+        columns_of_interest = list(set(['date', f"{DATE_NAME_TRANSLATOR[temporal_res]}", f"{DATE_NAME_TRANSLATOR[temporal_res]}_name", 'X', 'Y', 'season', 'count']))
 
-    if not os.path.exists(f'data_dir/{temporal_res}_ctxtSize{context_size}_{map_size}Map'):
-        os.makedirs(f'data_dir/{temporal_res}_ctxtSize{context_size}_{map_size}Map') 
-
-    gdf.sort_values(by='date').to_csv(f'data_dir/{temporal_res}_ctxtSize{context_size}_{map_size}Map/intermed_df.csv')
-
-    return gdf.sort_values(by='date')[columns_of_interest]
+    return gpd.GeoDataFrame(gdf.sort_values(by='date')[columns_of_interest], geometry=gpd.points_from_xy(gdf.X, gdf.Y), crs='EPSG:26914')
 
 
 def cut_gpd_water(gpdf, x_left=0, y1_up=(1/3), x_right=0, y2_up=0.5, less=True):
@@ -436,7 +439,7 @@ def points_to_boxes(gdf, temporal_res, box_length_m, keep_geometry_col, complete
     """
     Given gdf with x;y;count;tstep, assign counts to boxes 
     """
-
+    
     if 'years_through_2011' in kwargs.keys():
         years_through_2011 = kwargs['years_through_2011']
     if 'years_cut_from_back' in kwargs.keys():
@@ -451,7 +454,7 @@ def points_to_boxes(gdf, temporal_res, box_length_m, keep_geometry_col, complete
         
         filtered_gdf = gdf[gdf[f'{DATE_NAME_TRANSLATOR[temporal_res]}_name'] == tstep]
         # Read in bounding box from data folder
-        with open("../data/raw/aerial_surv/boxes_total_bounds.txt", "r") as file:
+        with open("../../data/raw/aerial_surv/boxes_total_bounds.txt", "r") as file:
             bounds = file.read()
         
         min_x, min_y, max_x, max_y = ast.literal_eval(bounds)
@@ -477,6 +480,7 @@ def points_to_boxes(gdf, temporal_res, box_length_m, keep_geometry_col, complete
 
         # Add the counts to the grid GeoDataFrame
         full_grid['counts'] = counts
+        # print(filtered_gdf.shape, filtered_gdf[f'{DATE_NAME_TRANSLATOR[temporal_res]}'].shape, type(filtered_gdf[f'{DATE_NAME_TRANSLATOR[temporal_res]}']))
         full_grid[f'{DATE_NAME_TRANSLATOR[temporal_res]}_id'] = filtered_gdf[f'{DATE_NAME_TRANSLATOR[temporal_res]}'].unique()[0]
         full_grid[f'{DATE_NAME_TRANSLATOR[temporal_res]}_name'] = tstep
 
@@ -486,9 +490,9 @@ def points_to_boxes(gdf, temporal_res, box_length_m, keep_geometry_col, complete
         full_grid['counts'] = full_grid['counts'].fillna(0)
 
         # add indicator
-        full_grid['season_indicator'] = SEASONAL_TRANSLATOR[datetime.strptime(tstep.split('_')[0], '%Y-%m-%d').month]
-
-        full_grid['year'] = datetime.strptime(tstep.split('_')[0], '%Y-%m-%d').year
+        if temporal_res != 'seasonal':
+            full_grid['season_indicator'] = SEASONAL_TRANSLATOR[datetime.strptime(tstep.split('_')[0], '%Y-%m-%d').month]
+            full_grid['year'] = datetime.strptime(tstep.split('_')[0], '%Y-%m-%d').year
         
         # print(f"unique counts for {tstep}: {full_grid['counts'].unique()}")
         all_gdfs.append(full_grid)
@@ -517,12 +521,15 @@ def points_to_boxes(gdf, temporal_res, box_length_m, keep_geometry_col, complete
 
         combined_gdf = cut_gpd_water(cut_gpd_water(combined_gdf, y1_up=y_left_lower_line, y2_up=y_right_lower_line, less=True), y1_up=y_left_upper_line, y2_up=y_right_upper_line, less=False)
 
+    combined_gdf['geoid'] = pd.factorize(list(zip(combined_gdf['lat'], combined_gdf['long'])))[0]
 
-    if not os.path.exists(f'data_dir/{temporal_res}_ctxtSize{context_size}_{map_size}Map'):
-        os.makedirs(f'data_dir/{temporal_res}_ctxtSize{context_size}_{map_size}Map') 
+    path_to_data = f"../../data/aerial_surv/{temporal_res}_{map_size}Map_{box_length_m}M"
+
+    if not os.path.exists(path_to_data):
+        os.makedirs(path_to_data) 
 
     # Make "README" of sorts for each dataset
-    with open(f'data_dir/{temporal_res}_ctxtSize{context_size}_{map_size}Map/EDA.txt', 'w') as file:
+    with open(f'{path_to_data}/EDA.txt', 'w') as file:
         
         file.write(f'This file contains basic information about the dataset.\n\n')
         
@@ -560,8 +567,6 @@ def points_to_boxes(gdf, temporal_res, box_length_m, keep_geometry_col, complete
             count_str = str({val: ct for val, ct in zip(unique_vals, counts)})
             file.write(f"{tstep}: {count_str}\n")
         
-        # counts 
-
     if complete_idx_square:
         tstep_ids = combined_gdf.index.get_level_values(f'{DATE_NAME_TRANSLATOR[temporal_res]}_id').unique()
         geometries = combined_gdf.index.get_level_values('geometry').unique()
@@ -573,7 +578,20 @@ def points_to_boxes(gdf, temporal_res, box_length_m, keep_geometry_col, complete
         combined_gdf = combined_gdf[combined_gdf.index.get_level_values(f'{DATE_NAME_TRANSLATOR[temporal_res]}_id') > min_tstep]
 
     combined_gdf = combined_gdf.drop(columns=['geometry_col']).droplevel(1).reset_index()
-    combined_gdf.to_csv(f'data_dir/{temporal_res}_ctxtSize{context_size}_{map_size}Map/final_gdf.csv')
+
+    # add season indicator and year if the 
+    cols_of_interest = ['geoid', f'{DATE_NAME_TRANSLATOR[temporal_res]}_id', 'counts', 'lat', 'long']
+
+    if temporal_res != 'seasonal':
+        cols_of_interest += ['season_indicator', 'year']
+
+    temporal_id_info = combined_gdf[[f'{DATE_NAME_TRANSLATOR[temporal_res]}_id', f'{DATE_NAME_TRANSLATOR[temporal_res]}_name']].groupby(f'{DATE_NAME_TRANSLATOR[temporal_res]}_id').first()
+    temporal_id_info.to_csv(f'{path_to_data}/temporal_id_info.csv', index=False)
+
+    combined_gdf = combined_gdf[cols_of_interest]
+    print(combined_gdf.columns, '1')
+    combined_gdf.to_csv(f'{path_to_data}/gdf.csv', index=False)
+
     return combined_gdf
 
 
@@ -624,7 +642,7 @@ def clip_by_sightings(gps, timescale, type_='', pct_thresh=0.05):
 
     RETURNS: dataframe with some all-zero weeks cut out, depending on type_
     """
-    gps.sort_index(inplace=True)
+    gps.sort_index(inpflace=True)
 
     if type_ not in ['first_crane', 'percentile']:
         raise ValueError('please read documentation for type_')
@@ -729,165 +747,6 @@ def create_context_df(x_df, y_df, info_df,
     return DataSet(pd.concat(xs), pd.concat(ys), pd.concat(infos))
 
 
-def create_task(
-    gps,
-    study='asurv',
-    start_year = 2009,
-    end_year = 2016,
-    timescale = 'seasonal',
-    box_length_m=500,
-    season_clip_method='first_crane',
-    lag_tsteps = 1,
-    context_size = 3,
-    geography_col = 'geoid',
-    outcome_col = 'counts',
-    year_col='season_id_year',
-    map_size='small'):
-
-    """
-    overall function that creates the task
-    """ 
-    # cut to while  
-
-    timestep_col = f'{DATE_NAME_TRANSLATOR[timescale]}_id'
-
-    # cut to after tstep 137 (1994 fall)
-    gps = enum_geoid(gps, timescale)
-
-    if study == 'gps' and not (timescale == '2monthly' or timescale == '3monthly'):
-        tr_years = [2009, 2010, 2011, 2012, 2013],
-        va_years = [2014]
-        te_years = [2015, 2016]
-
-    else:
-        # set percent of the data to use for train valid test
-        train_pct = 0.8
-        valid_pct = 0.1
-        test_pct = 0.1
-
-        if timescale == '2monthly' or timescale == '3monthly':
-            start_year = gps[f"{DATE_NAME_TRANSLATOR[timescale]}_id"].min()
-            end_year = gps[f"{DATE_NAME_TRANSLATOR[timescale]}_id"].max()
-
-            tr_years = np.arange(153, 168, 1)
-            va_years = np.arange(168, 174, 1)
-            te_years = np.arange(174, 180, 1)
-
-        else:
-            pass
-        # tr_years = np.arange(start_year, start_year + (end_year - start_year) * train_pct, 1, dtype='int')
-        # va_years = np.arange(start_year + (end_year - start_year) * train_pct + 1, start_year + (end_year - start_year) * (train_pct + valid_pct) + 1, 1, dtype='int')
-        # te_years = np.arange(start_year + (end_year - start_year) * (train_pct + valid_pct) + 2, end_year + 1, 1, dtype='int')
-        print(f"train years: {tr_years}")
-        print(f"valid years: {va_years}")
-        print(f"test years: {te_years}")
-    
-    # function args
-    x_cols = [timestep_col, 'lat', 'long', 'season_indicator']
-    y_cols = [outcome_col]
-    info_cols = [year_col]
-    tr_years = np.sort(np.unique(np.asarray(tr_years)))
-    va_years = np.sort(np.unique(np.asarray(va_years)))
-    te_years = np.sort(np.unique(np.asarray(te_years)))
-    assert np.max(tr_years) < np.min(va_years)
-    assert np.max(va_years) < np.min(te_years)
-
-    # Create the multiindex, reinserting timestep as a col not just index
-    print(gps.columns)
-    print(gps.index)
-    print(geography_col, timestep_col)
-    gps = gps.astype({geography_col: np.int64, timestep_col: np.int64})
-    gps = gps.set_index([geography_col, timestep_col])
-    gps[timestep_col] = gps.index.get_level_values(timestep_col)
-    # geoid_key_df = gps.droplevel(1, axis=0)[['lat', 'long']]
-    # geoid_key_df = geoid_key_df.loc[~info_df.index.duplicated(keep='first')]
-
-    if season_clip_method == 'by_season' and timescale != 'seasonal' and timescale != '2monthly' and timescale != '3monthly':
-        gps, valid_tsteps = clip_by_month(gps, timescale=timescale, first_month=11, last_month=4)
-
-    # clip weeks with zeros
-    if timescale != 'seasonal' and timescale != '2monthly' and timescale != '3monthly':
-        
-        print(f'clipping zero weeks by {season_clip_method}')
-        
-        if season_clip_method == 'by_season':
-            gps, valid_tsteps = clip_by_month(gps, timescale=timescale, first_month=11, last_month=4)
-        else:
-            valid_tsteps = clip_by_sightings(gps, timescale=timescale, type_=season_clip_method, pct_thresh=0.05) # first_month=11, last_month=4,
-            print(valid_tsteps)
-        
-        gps = gps[gps[f'{DATE_NAME_TRANSLATOR[timescale]}_name'].isin(valid_tsteps[f'{DATE_NAME_TRANSLATOR[timescale]}_name'].unique())]
-        # map season year names to tsteps
-        week_to_season = {w: s for w, s in zip(valid_tsteps[f'{DATE_NAME_TRANSLATOR[timescale]}_name'], valid_tsteps['season_year'])}
-        gps['season_id_year'] = gps[f'{DATE_NAME_TRANSLATOR[timescale]}_name'].map(week_to_season)
-
-    else:
-        gps['season_id_year'] = gps[f'{DATE_NAME_TRANSLATOR[timescale]}_id']
-
-    # start x/y split
-    x_df = gps[x_cols].copy()
-    y_df = gps[y_cols].copy()
-    info_df = gps[info_cols].copy()
-
-    tr_tup = create_context_df(x_df, y_df, info_df,
-        tr_years[0], tr_years[-1],
-        context_size, lag_tsteps,
-        year_col=year_col, timestep_col=timestep_col, outcome_col=outcome_col)
-    
-    va_tup = create_context_df(x_df, y_df, info_df,
-        va_years[0], va_years[-1],
-        context_size, lag_tsteps,
-        year_col=year_col, timestep_col=timestep_col, outcome_col=outcome_col)
-
-    te_tup = create_context_df(x_df, y_df, info_df,
-        te_years[0], te_years[-1],
-        context_size, lag_tsteps,
-        year_col=year_col, timestep_col=timestep_col, outcome_col=outcome_col)
-
-    if 'save_files_torch_exps' in os.getcwd():
-        path = '../data_dir'
-    elif 'prob_diff_topk' in os.getcwd():
-        path = 'data_dir'
-    elif 'code' in os.getcwd():
-        path = 'prob_diff_topk/data_dir'
-    else:
-        path = 'code/prob_diff_topk/data_dir'
- 
-    if not os.path.exists(f'data_dir/{timescale}_ctxtSize{context_size}_{map_size}Map'):
-        os.makedirs(f'data_dir/{timescale}_ctxtSize{context_size}_{map_size}Map')       
-
-    xtrain = tr_tup.x.droplevel(f'{DATE_NAME_TRANSLATOR[timescale]}_id').rename(columns={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-    xval = va_tup.x.droplevel(f'{DATE_NAME_TRANSLATOR[timescale]}_id').rename(columns={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-    xtest = te_tup.x.droplevel(f'{DATE_NAME_TRANSLATOR[timescale]}_id').rename(columns={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-
-    xtrain.to_csv(f'data_dir/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_train_x.csv')
-    xval.to_csv(f'data_dir/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_valid_x.csv')
-    xtest.to_csv(f'data_dir/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_test_x.csv')
-
-    ytrain = tr_tup.y.rename_axis(index={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-    yval = va_tup.y.rename_axis(index={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-    ytest = te_tup.y.rename_axis(index={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-
-    ytrain.to_csv(f'data_dir/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_train_y.csv')
-    yval.to_csv(f'data_dir/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_valid_y.csv')
-    ytest.to_csv(f'data_dir/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_test_y.csv')
-
-    # if not os.path.exists(f'{path}/{study}/{timescale}_ctxtSize{context_size}_{map_size}Map'):
-    #     os.makedirs(f'{path}/{study}/{timescale}_ctxtSize{context_size}_{map_size}Map')
-
-    # xtrain.to_csv(f'{path}/{study}/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_train_x.csv')
-    # xval.to_csv(f'{path}/{study}/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_valid_x.csv')
-    # xtest.to_csv(f'{path}/{study}/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_test_x.csv')
-
-    # ytrain = tr_tup.y.rename_axis(index={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-    # yval = va_tup.y.rename_axis(index={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-    # ytest = te_tup.y.rename_axis(index={f'{DATE_NAME_TRANSLATOR[timescale]}_id': 'timestep'})
-
-    # ytrain.to_csv(f'{path}/{study}/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_train_y.csv')
-    # yval.to_csv(f'{path}/{study}/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_valid_y.csv')
-    # ytest.to_csv(f'{path}/{study}/{timescale}_ctxtSize{context_size}_{map_size}Map/bird_test_y.csv')
-
-
 def main(temporal_res: str, context_size=5, box_length_m=500, map_size='small', **kwargs):
     """
     Converts whooping crane raw data to dataset format
@@ -910,27 +769,81 @@ def main(temporal_res: str, context_size=5, box_length_m=500, map_size='small', 
     keep_geometry_col=keep_geometry_col, complete_idx_square=complete_idx_square, years_through_2011=years_through_2011, 
     map_size=map_size, context_size=5, tsteps_to_study=tsteps_to_study)
 
-    x = df_to_tensor(gdf, temporal_res=temporal_res)
-    y = df_to_y_tensor(gdf, temporal_res=temporal_res)
+    # TODO here configure which column go in which dataset
+    print('gdf columns', gdf.columns, '3')
+    # print('gdf index', gdf.index)
 
-    # make sure lookback data was accurately shifted back
-    tracts = x.shape[1]
-    assert tracts == y.shape[1]
-    for i in range(tracts):
-        # index 4 of dim 3 of X = target y at timestep t-1
-        assert x[2, i, 4] == y[1, i]
+    if temporal_res == 'seasonal':
 
-    A = compute_adjacency_matrix(gdf)
-    dataset = {'features': x, 'targets': y, 'graph': A}
+        dataset_specs = {
+            'lookback': 5,
+            'time_name': f'{DATE_NAME_TRANSLATOR[temporal_res]}_id',
+            'space_name': 'geoid',
+            'target_name': 'counts',
+            'static': ['lat', 'long'],
+            'dynamic': [],
+            'temporal': [],
+            'latlong': False,
+            'box_length_m': box_length_m,
+        }
 
-    path_to_final_data = '../data/model-ready'
+    else:
+
+        dataset_specs = {
+            'lookback': 5,
+            'time_name': f'{DATE_NAME_TRANSLATOR[temporal_res]}_id',
+            'space_name': 'geoid',
+            'target_name': 'counts',
+            'static': ['lat', 'long'],
+            'dynamic': [],
+            'temporal': ['season_indicator', 'year'],
+            'latlong': True,
+            'box_length_m': box_length_m,
+        }
+
+
+    return gdf, dataset_specs
+    # return Dataset(full_df=gdf, **dataset_specs)
+
+def initialize_from_full_df(full_df, dataset_specs):
+    """
+            dataset_specs = {
+                    'lookback':
+                    'time_name': 
+                    'space_name': 
+                    'target_name':
+                    'static': 
+                    'dynamic': 
+                    'temporal': 
+                    'latlong': 
+                    'box_length_m'
+                }
+    """
+
+    print(full_df)
+    print(full_df.columns)
+
+    dynamic_feats_TSFd = df_to_tensor(full_df, type_='dynamic', **dataset_specs)
+    static_feats_SFs = df_to_tensor(full_df, type_='static', **dataset_specs)
+    temp_feats_TFt = df_to_tensor(full_df, type_='temporal', **dataset_specs)
+    # TODO add dist_sensitivity as user argument
+    adj_SS = compute_adjacency_matrix(full_df, dist_sensitivity=30, **dataset_specs)
+
+    time = dataset_specs['time_name']
+    spatial_bin_size = dataset_specs['box_length_m']
+    path_to_final_data = f'../../data/aerial_surv/model-ready/{time_name}_{box_length_m}M'
     if not os.path.exists(path_to_final_data):
         os.makedirs(path_to_final_data)
 
-    with open(f'{path_to_final_data}/aerial_surv.pkl', 'wb') as f:
-        pickle.dump(dataset, f)
+    dynamic_feats_TSFd.to_csv(f'{path_to_final_data}/dynamic.csv')
+    static_feats_SFs.to_csv(f'{path_to_final_data}/static.csv')
+    temp_feats_TFt.to_csv(f'{path_to_final_data}/temporal.csv')
+    adj_SS.to_csv(f'{path_to_final_data}/adjacency.csv')
     
     print(f'Data loaded to {path_to_final_data}')
+
+
+
 
 
 if __name__ == '__main__':
@@ -945,4 +858,6 @@ if __name__ == '__main__':
     args = vars(parser.parse_args())
     print(args)
 
-    main(**args)
+    gdf, dataset_specs = main(**args)
+
+    initialize_from_full_df(gdf, dataset_specs)
