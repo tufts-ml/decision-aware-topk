@@ -103,13 +103,15 @@ def df_to_tensor_dynamic(df, feature_cols, lookback=5, time_name='bimonth_id', s
                 lag_tensors.append(torch.full((features_tensor.shape[0], 1), float('nan'), dtype=torch.float))
         lag_tensor = torch.cat(lag_tensors, dim=1)  # shape: (S, lookback)
 
+        # Create current counts tensor
+        current_counts = sub_df[target_name].values
+        current_counts_tensor = torch.tensor(current_counts, dtype=torch.float).unsqueeze(1)
+
         # Concatenate features with lag tensors
-        combined_tensor = torch.cat([features_tensor, lag_tensor], dim=1)  # shape: (S, F + lookback)
+        combined_tensor = torch.cat([current_counts_tensor, features_tensor, lag_tensor], dim=1)  # shape: (S, F + lookback)
         tensor_list.append(combined_tensor)
 
         # Update prev_counts_list with current counts tensor
-        current_counts = sub_df[target_name].values
-        current_counts_tensor = torch.tensor(current_counts, dtype=torch.float).unsqueeze(1)
         prev_counts_list.insert(0, current_counts_tensor)
         if len(prev_counts_list) > lookback:
             prev_counts_list.pop()
