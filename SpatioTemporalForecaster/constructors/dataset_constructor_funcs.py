@@ -133,7 +133,7 @@ def df_to_tensor_temporal(df, feature_cols, time_name):
 """
 Functions that take a T x S x F tensor and output x, y, adjacency matrix
 """
-def df_to_tensor(df, type_='dynamic', lookback=5, time_name='bimonth_id', space_name='geoid', target_name='counts', static=None, dynamic=None, temporal=None, latlong=True, box_length_m=500):
+def df_to_tensor(df, type_='dynamic', lookback=5, time_name='bimonth_id', space_name='geoid', target_name='counts', static=None, dynamic=None, temporal=None, latlong=True, box_length_m=500, **kwargs):
     """
     Converts a dataframe into a torch tensor of shape (T, S, F + lookback), where:
       - T: number of timesteps (based on the temporal id column)
@@ -236,15 +236,13 @@ def compute_adjacency_matrix(df, dist_sensitivity=30, **dataset_specs):
     A torch tensor of shape (S, S) representing the adjacency matrix.
   """
   
-  if 'latlong' in dataset_specs:
-    latlong = dataset_specs['latlong']
-  else:
-    latlong = None    
+  lat = dataset_specs['lat_name']  
+  long = dataset_specs['long_name']  
 
-  if latlong:
+  if lat and long:
 
     # Extract coordinates as a tensor of shape (S, 2)
-    coords = df[['lat', 'long']].groupby(['lat', 'long']).first().reset_index().values
+    coords = df[[lat, long]].groupby([lat, long]).first().reset_index().values
     coords_tensor = torch.tensor(coords, dtype=torch.float)
 
     # Compute pairwise Euclidean distances

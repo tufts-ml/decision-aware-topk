@@ -778,13 +778,15 @@ def main(temporal_res: str, context_size=5, box_length_m=500, map_size='small', 
 
         dataset_specs = {
             'lookback': 5,
+            'time_length': DATE_NAME_TRANSLATOR[temporal_res],
             'time_name': f'{DATE_NAME_TRANSLATOR[temporal_res]}_id',
             'space_name': 'geoid',
             'target_name': 'counts',
             'static': ['lat', 'long'],
             'dynamic': [],
             'temporal': [],
-            'latlong': False,
+            'lat_name': 'lat',
+            'long_name': 'long',
             'box_length_m': box_length_m,
         }
 
@@ -792,13 +794,15 @@ def main(temporal_res: str, context_size=5, box_length_m=500, map_size='small', 
 
         dataset_specs = {
             'lookback': 5,
+            'time_length': DATE_NAME_TRANSLATOR[temporal_res],
             'time_name': f'{DATE_NAME_TRANSLATOR[temporal_res]}_id',
             'space_name': 'geoid',
             'target_name': 'counts',
             'static': ['lat', 'long'],
             'dynamic': [],
             'temporal': ['season_indicator', 'year'],
-            'latlong': True,
+            'lat_name': 'lat',
+            'long_name': 'long',
             'box_length_m': box_length_m,
         }
 
@@ -806,7 +810,7 @@ def main(temporal_res: str, context_size=5, box_length_m=500, map_size='small', 
     return gdf, dataset_specs
     # return Dataset(full_df=gdf, **dataset_specs)
 
-def initialize_from_full_df(full_df, dataset_specs):
+def initialize_from_full_df(full_df, dataset_specs, type_='aerial_surv'):
     """
             dataset_specs = {
                     'lookback':
@@ -815,8 +819,9 @@ def initialize_from_full_df(full_df, dataset_specs):
                     'target_name':
                     'static': 
                     'dynamic': 
-                    'temporal': 
-                    'latlong': 
+                    'temporal':
+                    'lat_name': 
+                    'long_name':
                     'box_length_m'
                 }
     """
@@ -831,8 +836,13 @@ def initialize_from_full_df(full_df, dataset_specs):
     adj_SS = compute_adjacency_matrix(full_df, dist_sensitivity=30, **dataset_specs)
 
     time_name = dataset_specs['time_name']
+    time_length = dataset_specs['time_length']
     box_length_m = dataset_specs['box_length_m']
-    path_to_final_data = f'../../data/aerial_surv/model-ready/{time_name}_{box_length_m}M'
+
+    if box_length_m: 
+        path_to_final_data = f'../../data/{type_}/model-ready/{time_length}_{box_length_m}M'
+    else:
+        path_to_final_data = f'../../data/{type_}/model-ready/{time_length}'
 
     if not os.path.exists(path_to_final_data):
         os.makedirs(path_to_final_data)
