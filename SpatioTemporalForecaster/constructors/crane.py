@@ -10,6 +10,7 @@ from datetime import datetime
 from collections import namedtuple
 import ast
 import pickle
+import json
 from dataset_constructor_funcs import df_to_tensor, df_to_y_tensor, compute_adjacency_matrix
 
 ### TODO 
@@ -829,20 +830,26 @@ def initialize_from_full_df(full_df, dataset_specs):
     # TODO add dist_sensitivity as user argument
     adj_SS = compute_adjacency_matrix(full_df, dist_sensitivity=30, **dataset_specs)
 
-    time = dataset_specs['time_name']
-    spatial_bin_size = dataset_specs['box_length_m']
+    time_name = dataset_specs['time_name']
+    box_length_m = dataset_specs['box_length_m']
     path_to_final_data = f'../../data/aerial_surv/model-ready/{time_name}_{box_length_m}M'
+
     if not os.path.exists(path_to_final_data):
         os.makedirs(path_to_final_data)
+    if not os.path.exists(f"{path_to_final_data}/dynamic"):
+        os.makedirs(f"{path_to_final_data}/dynamic")
 
-    dynamic_feats_TSFd.to_csv(f'{path_to_final_data}/dynamic.csv')
+
+    for arr_slice in range(dynamic_feats_TSFd.shape[0]):
+        np.savetxt(f'{path_to_final_data}/dynamic/tstep_{arr_slice}.csv', dynamic_feats_TSFd[arr_slice, :, :].numpy(), delimiter=',')
+
     static_feats_SFs.to_csv(f'{path_to_final_data}/static.csv')
     temp_feats_TFt.to_csv(f'{path_to_final_data}/temporal.csv')
-    adj_SS.to_csv(f'{path_to_final_data}/adjacency.csv')
-    
+    np.savetxt(f'{path_to_final_data}/adjacency.csv', adj_SS.numpy(), delimiter=',')
+    with open(f"{path_to_final_data}/dataset_specs.json", "w") as f:
+        json.dump(dataset_specs, f, indent=4)
+
     print(f'Data loaded to {path_to_final_data}')
-
-
 
 
 

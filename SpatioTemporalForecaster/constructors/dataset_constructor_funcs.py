@@ -78,9 +78,7 @@ SEASONAL_TRANSLATOR = {
 METERS_PER_DEGREE = 111111
 
 
-def df_to_tensor_dynamic(df, lookback=5, time_name='bimonth_id', space_name='geoid', target_name='counts'):
-
-
+def df_to_tensor_dynamic(df, feature_cols, lookback=5, time_name='bimonth_id', space_name='geoid', target_name='counts'):
 
     # Determine the name of the temporal id column
     id_col = time_name
@@ -121,11 +119,13 @@ def df_to_tensor_dynamic(df, lookback=5, time_name='bimonth_id', space_name='geo
     return result_tensor
 
 
-def df_to_tensor_static(gdf, **kwargs):
-  pass
+def df_to_tensor_static(df, feature_cols, space_name='geoid'):
 
-def df_to_tensor_temporal(gdf, **kwargs):
-    pass
+  return df.groupby(space_name).first()
+
+def df_to_tensor_temporal(df, feature_cols, time_name):
+
+  return df.groupby(time_name).first()
 
 
 """
@@ -159,28 +159,28 @@ def df_to_tensor(df, type_='dynamic', lookback=5, time_name='bimonth_id', space_
 
       df = df[[space_name, time_name, target_name] + dynamic]
       feature_cols = dynamic
-      args = { } # TODO add
+      args = {'lookback': lookback, 'time_name': time_name, 'space_name': space_name, 'target_name': target_name} # TODO add
       func = df_to_tensor_dynamic
 
     elif type_ == 'static':
 
       df = df[[space_name] + static]
       feature_cols = static
-      args = { } # TODO add
+      args = {'space_name': space_name} 
       func = df_to_tensor_static
     
     elif type_ == 'temporal':
       
       df = df[[time_name] + temporal]
       feature_cols = temporal
-      args = {} # TODO add
+      args = {'time_name': time_name} 
       func = df_to_tensor_temporal
 
     else: 
       raise ValueError('dataset type must be dynamic, static, or temporal')
   
     print('features', df.columns)
-    return func(gdf, **args)
+    return func(df, feature_cols, **args)
 
 
 
@@ -236,6 +236,8 @@ def compute_adjacency_matrix(df, dist_sensitivity=30, **dataset_specs):
   
   if 'latlong' in dataset_specs:
     latlong = dataset_specs['latlong']
+  else:
+    latlong = None    
 
   if latlong:
 
