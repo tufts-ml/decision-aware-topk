@@ -11,11 +11,79 @@ from collections import namedtuple
 import ast
 import pickle
 import json
-from dataset_constructor_funcs import df_to_tensor, df_to_y_tensor, compute_adjacency_matrix
+import sys
+
+sys.path.append('../spatiotemporalforecaster')
+from dataset import Dataset
 
 ### TODO 
 ### split into static and dynamic features for seasonal effects
 ### add constructor for GPS
+
+
+    
+# defining date range
+DATE_RANGE_TRANSLATOR = {  
+    'daily': 'D',
+    'weekly': 'W',
+    'biweekly': '2W',
+    'monthly': 'ME',
+    '2monthly': '2ME',
+    '3monthly': '3ME'
+}
+# how much temporal buffer to give based on resolution
+DATE_OFFSET_TRANSLATOR = {  
+    'daily': 1,
+    'weekly': 7,
+    'biweekly': 14,
+    'monthly': 30,
+    '2monthly': 60,
+    '3monthly': 90
+}
+# naming the temporal column
+DATE_NAME_TRANSLATOR = {  
+    'daily': 'day',
+    'weekly': 'week',
+    'biweekly': 'biweek',
+    'monthly': 'month',
+    '2monthly': 'bimonth',
+    '3monthly': 'trimonth',
+    'seasonal': 'season'
+}
+
+MONTH_PAIRS_TRANSLATOR = {
+    '2monthly': ["02-28", "04-30", "10-20", "12-25"],
+    '3monthly': ["01-31", "04-30", "10-20"]
+}
+
+
+
+MAP_SIZE_TRANSLATOR = {
+    'medium': {
+        'y_left_lower_line': 0,
+        'y_right_lower_line': 0.45,
+        'y_left_upper_line': 0.35,
+        'y_right_upper_line': 0.95
+    },
+    'small': {
+        'y_left_lower_line': 0.06,
+        'y_right_lower_line': 0.72,
+        'y_left_upper_line': 0.3,
+        'y_right_upper_line': 0.5
+    }
+}
+
+SEASONAL_TRANSLATOR = {
+    9: 0,
+    10: 1,
+    11: 2,
+    12: 3,
+    1: 4,
+    2: 5,
+    3: 6, 
+    4: 7
+}
+
 
 # defining date range
 DATE_RANGE_TRANSLATOR = {  
@@ -810,57 +878,6 @@ def main(temporal_res: str, context_size=5, box_length_m=500, map_size='small', 
     return gdf, dataset_specs
     # return Dataset(full_df=gdf, **dataset_specs)
 
-def initialize_from_full_df(full_df, dataset_specs, type_='aerial_surv'):
-    """
-            dataset_specs = {
-                    'lookback':
-                    'time_name': 
-                    'space_name': 
-                    'target_name':
-                    'static': 
-                    'dynamic': 
-                    'temporal':
-                    'lat_name': 
-                    'long_name':
-                    'box_length_m'
-                }
-    """
-
-    print(full_df)
-    print(full_df.columns)
-
-    dynamic_feats_TSFd = df_to_tensor(full_df, type_='dynamic', **dataset_specs)
-    static_feats_SFs = df_to_tensor(full_df, type_='static', **dataset_specs)
-    temp_feats_TFt = df_to_tensor(full_df, type_='temporal', **dataset_specs)
-    # TODO add dist_sensitivity as user argument
-    adj_SS = compute_adjacency_matrix(full_df, dist_sensitivity=30, **dataset_specs)
-
-    time_name = dataset_specs['time_name']
-    time_length = dataset_specs['time_length']
-    box_length_m = dataset_specs['box_length_m']
-
-    if box_length_m: 
-        path_to_final_data = f'../../data/{type_}/model-ready/{time_length}_{box_length_m}M'
-    else:
-        path_to_final_data = f'../../data/{type_}/model-ready/{time_length}'
-
-    if not os.path.exists(path_to_final_data):
-        os.makedirs(path_to_final_data)
-    if not os.path.exists(f"{path_to_final_data}/dynamic"):
-        os.makedirs(f"{path_to_final_data}/dynamic")
-
-
-    for arr_slice in range(dynamic_feats_TSFd.shape[0]):
-        np.savetxt(f'{path_to_final_data}/dynamic/tstep_{arr_slice}.csv', dynamic_feats_TSFd[arr_slice, :, :].numpy(), delimiter=',')
-
-    static_feats_SFs.to_csv(f'{path_to_final_data}/static.csv')
-    temp_feats_TFt.to_csv(f'{path_to_final_data}/temporal.csv')
-    np.savetxt(f'{path_to_final_data}/adjacency.csv', adj_SS.numpy(), delimiter=',')
-    with open(f"{path_to_final_data}/dataset_specs.json", "w") as f:
-        json.dump(dataset_specs, f, indent=4)
-
-    print(f'Data loaded to {path_to_final_data}')
-
 
 
 if __name__ == '__main__':
@@ -875,6 +892,16 @@ if __name__ == '__main__':
     args = vars(parser.parse_args())
     print(args)
 
-    gdf, dataset_specs = main(**args)
+    filename = 'aerial_surv'
+    time_length = 'bimonth'
+    box_length_m = args['box_length_m']
+    path = f'../../data/{filename}/model-ready/{time_length}_{box_length_m}M'
+    data_class = Dataset(path=path)
 
-    initialize_from_full_df(gdf, dataset_specs)
+    print(data_class.dataset_specs)
+
+    # gdf, dataset_specs = main(**args)
+
+    # data_class = Dataset(full_df=gdf, dataset_specs=dataset_specs)
+
+    # data_class.to_disk(filename='aerial_surv')

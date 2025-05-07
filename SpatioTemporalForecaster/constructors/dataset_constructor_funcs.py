@@ -12,67 +12,6 @@ import ast
 import pickle
 
 
-# defining date range
-DATE_RANGE_TRANSLATOR = {  
-    'daily': 'D',
-    'weekly': 'W',
-    'biweekly': '2W',
-    'monthly': 'ME',
-    '2monthly': '2ME',
-    '3monthly': '3ME'
-}
-# how much temporal buffer to give based on resolution
-DATE_OFFSET_TRANSLATOR = {  
-    'daily': 1,
-    'weekly': 7,
-    'biweekly': 14,
-    'monthly': 30,
-    '2monthly': 60,
-    '3monthly': 90
-}
-# naming the temporal column
-DATE_NAME_TRANSLATOR = {  
-    'daily': 'day',
-    'weekly': 'week',
-    'biweekly': 'biweek',
-    'monthly': 'month',
-    '2monthly': 'bimonth',
-    '3monthly': 'trimonth',
-    'seasonal': 'season'
-}
-
-MONTH_PAIRS_TRANSLATOR = {
-    '2monthly': ["02-28", "04-30", "10-20", "12-25"],
-    '3monthly': ["01-31", "04-30", "10-20"]
-}
-
-
-
-MAP_SIZE_TRANSLATOR = {
-    'medium': {
-        'y_left_lower_line': 0,
-        'y_right_lower_line': 0.45,
-        'y_left_upper_line': 0.35,
-        'y_right_upper_line': 0.95
-    },
-    'small': {
-        'y_left_lower_line': 0.06,
-        'y_right_lower_line': 0.72,
-        'y_left_upper_line': 0.3,
-        'y_right_upper_line': 0.5
-    }
-}
-
-SEASONAL_TRANSLATOR = {
-    9: 0,
-    10: 1,
-    11: 2,
-    12: 3,
-    1: 4,
-    2: 5,
-    3: 6, 
-    4: 7
-}
 
 # meters per degree lat or long
 METERS_PER_DEGREE = 111111
