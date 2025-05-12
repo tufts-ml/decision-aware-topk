@@ -3,6 +3,19 @@
 scratch*
 output/
 test*/
+
+
+# SpatioTemporalForecaster
+SpatioTemporalForecaster/tests/__pycache__
+SpatioTemporalForecaster/data_dir
+SpatioTemporalForecaster/cook.py
+SpatioTemporalForecaster/crane.py
+
+# data
+data/model-ready
+data/raw/*/*
+
+
 logs/
 # Byte-compiled / optimized / DLL files
 __pycache__/
