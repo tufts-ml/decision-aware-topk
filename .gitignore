@@ -4,16 +4,26 @@ scratch*
 output/
 test*/
 
+.idea
+
+
+# data
+data/aerial_surv/*
+data/cook_county/*
+
 
 # SpatioTemporalForecaster
-SpatioTemporalForecaster/tests/__pycache__
+
+SpatioTemporalForecaster/constructors/monthly.csv
+SpatioTemporalForecaster/constructors/crane_nb.ipynb
+SpatioTemporalForecaster/constructors/dataset_constructor_funcs.py
+
+SpatioTemporalForecaster/spatiotemporalforecaster/jupyter_tests.ipynb
+
+SpatioTemporalForecaster/tests
 SpatioTemporalForecaster/data_dir
 SpatioTemporalForecaster/cook.py
 SpatioTemporalForecaster/crane.py
-
-# data
-data/model-ready
-data/raw/*/*
 
 
 logs/
