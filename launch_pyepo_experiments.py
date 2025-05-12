@@ -52,7 +52,7 @@ def build_job_script(dataset, method, step_size, pg_noise, outdir):
     return slurm_script
 
 def main(dryrun=False, smoke_test=False, exclude_smoke=False, start_index=0):
-    datasets = ["MA", "cook", "asurv"]
+    datasets = ["asurv"]
     methods = ["spo+", "pg"]
     step_sizes = np.logspace(-1, -3, 10)
     pg_noises = np.logspace(-2, 0, 10)

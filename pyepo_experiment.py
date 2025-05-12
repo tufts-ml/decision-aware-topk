@@ -178,6 +178,13 @@ def main(K=None, step_size=None, epochs=None,  seed=None, outdir=None, num_score
     }
 
     best_val_loss = float('inf')
+
+    # Initialize to historical average
+    model.beta.data.zero_()
+    model.beta_0.data[:-5].zero_()
+    model.beta_0.data[-5:].fill_(1.0)
+    model.b_0.data.zero_()
+    model.b_1.data.zero_()
     
     # Training loop
     for epoch in range(epochs):
