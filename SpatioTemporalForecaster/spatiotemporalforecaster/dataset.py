@@ -314,7 +314,6 @@ class Dataset:
             - user can upload a dataframe with the following form
                 (T x S) x F
                 and a dict with
-                    TODO fill
                     dataset_specs = {
                         'lookback':
                         'time_name': 

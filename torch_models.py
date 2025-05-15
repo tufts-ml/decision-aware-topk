@@ -90,9 +90,6 @@ class NegativeBinomialRegressionModel(nn.Module):
         samples = dist.sample((num_samples,))
         return torch.clamp(samples, self.low, self.high)
 
-    def params_to_single_tensor(self):
-        return torch.cat([param.view(-1) for param in self.parameters()])
-
     def single_tensor_to_params(self, single_tensor):
         params = []
         idx = 0
@@ -107,23 +104,6 @@ class NegativeBinomialRegressionModel(nn.Module):
         params = self.single_tensor_to_params(single_tensor)
         for param, new_data in zip(self.parameters(), params):
             param.data = new_data
-
-    def build_from_single_tensor(self, single_tensor, X, time):
-        beta_0, beta, b_0, b_1, log_sigma_0, log_sigma_1, rho, siginv_theta = self.single_tensor_to_params(single_tensor)
-        fixed_effects = beta_0 + torch.einsum('tli,i->tl', X, beta)
-        random_intercepts = b_0.expand(X.shape[0], -1)
-        random_slopes = b_1.expand(X.shape[0], -1)
-        
-        log_mu = fixed_effects + random_intercepts + random_slopes * time
-
-        # Use softplus to ensure mu is positive and grows more slowly
-        mu = nn.functional.softplus(log_mu)
-
-        # Calculate theta probability
-        theta = torch.nn.functional.sigmoid(siginv_theta)
-
-        
-        return NegativeBinomial(total_count=mu, probs=theta)
 
     def plot_learned(self, X, time, data=None, ax=None):
         import matplotlib.pyplot as plt
@@ -154,9 +134,6 @@ class MixtureOfPoissonsModel(nn.Module):
         # Initialize the log rates and mixture probabilities as learnable parameters
         self.log_poisson_rates = nn.Parameter(torch.rand(num_components), requires_grad=True)  # Initialize log rates
         self.mixture_probs = nn.Parameter(torch.rand(S, num_components), requires_grad=True)  # Initialize probabilities
-
-    def params_to_single_tensor(self):
-        return torch.cat([self.log_poisson_rates, self.mixture_probs.view(-1)])
     
     def single_tensor_to_params(self, single_tensor):
         log_poisson_rates = single_tensor[:self.num_components]
@@ -168,16 +145,6 @@ class MixtureOfPoissonsModel(nn.Module):
         self.log_poisson_rates.data = log_poisson_rates
         self.mixture_probs.data = mixture_probs
         return
-    
-    def build_from_single_tensor(self, single_tensor):
-        log_poisson_rates, mixture_probs = self.single_tensor_to_params(single_tensor)
-        poisson_rates = torch.exp(log_poisson_rates)
-        mixture_probs_normalized = torch.nn.functional.softmax(mixture_probs, dim=1)
-        categorical_dist = Categorical(mixture_probs_normalized)
-        expanded_rates = poisson_rates.expand(self.S, self.num_components)
-        poisson_dist = Poisson(expanded_rates, validate_args=False)
-        mixture_dist = MixtureSameFamily(categorical_dist, poisson_dist)
-        return mixture_dist
         
     def forward(self):
         # Transform log rates to rates
@@ -214,9 +181,6 @@ class MixtureOfTruncNormModel(nn.Module):
         self.softplusinv_means = nn.Parameter(torch.rand(num_components)*50, requires_grad=True) 
         self.softplusinv_scales = nn.Parameter(torch.rand(num_components), requires_grad=True) 
         self.mixture_probs = nn.Parameter(torch.rand(S, num_components), requires_grad=True)  
-
-    def params_to_single_tensor(self):
-        return torch.cat([param.view(-1) for param in self.parameters()])
     
     def single_tensor_to_params(self, single_tensor):
         softplusinv_means = single_tensor[:self.num_components]
@@ -230,18 +194,6 @@ class MixtureOfTruncNormModel(nn.Module):
         self.softplusinv_scales.data = softplusinv_scales
         self.mixture_probs.data = mixture_probs
         return
-    
-    def build_from_single_tensor(self, single_tensor):
-        softplusinv_means, softplusinv_scales, mixture_probs = self.single_tensor_to_params(single_tensor)
-        means = torch.nn.functional.softplus(softplusinv_means)
-        scales = torch.nn.functional.softplus(softplusinv_scales) + 0.2
-        mixture_probs_normalized = torch.nn.functional.softmax(mixture_probs, dim=1)
-        categorical_dist = Categorical(mixture_probs_normalized)
-        expanded_means = means.expand(self.S, self.num_components)
-        expanded_scales = scales.expand(self.S, self.num_components)
-        trunc_norm_dist = TruncatedNormal(expanded_means, expanded_scales, self.low, self.high, validate_args=False)
-        mixture_dist = MixtureSameFamily(categorical_dist, trunc_norm_dist, validate_args=False)
-        return mixture_dist
         
     def forward(self):
         means = torch.nn.functional.softplus(self.softplusinv_means)

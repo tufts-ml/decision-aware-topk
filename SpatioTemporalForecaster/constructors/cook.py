@@ -11,7 +11,6 @@ if __name__ == '__main__':
         temporal_res: year or semiannual
 
     Returns: dataset with dynamic, static, temporal, and adjacency matrix
-    TODO need to tune dist_sensitivity parameter for cook county
     """
 
     # read data

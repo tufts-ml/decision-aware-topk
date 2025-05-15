@@ -13,6 +13,7 @@ data/cook_county/*
 
 # SpatioTemporalForecaster
 
+SpatioTemporalForecaster/constructors/data_dir
 SpatioTemporalForecaster/constructors/monthly.csv
 SpatioTemporalForecaster/constructors/crane_nb.ipynb
 SpatioTemporalForecaster/constructors/dataset_constructor_funcs.py
